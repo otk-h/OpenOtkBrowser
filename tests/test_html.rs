@@ -1,7 +1,7 @@
-mod dom;
-mod html;
+use open_otk_browser::*;
 
-fn main() {
+#[test]
+fn test_html_parsing() {
     let html_input = r#"
         <div id="main" class="container">
             <h1>Hello Rust Browser</h1>
@@ -9,6 +9,6 @@ fn main() {
         </div>
     "#.to_string();
 
-    let root_node = html::parse(html_input);
+    let root_node = crate::html::parse(html_input);
     println!("{:#?}", root_node);
 }

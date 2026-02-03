@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "OpenOtkBrowser"
+name = "open_otk_browser"
 version = "0.1.0"
