@@ -1,4 +1,4 @@
-use crate::dom::Node;
+use crate::dom;
 use std::collections::HashMap;
 
 pub struct Parser {
@@ -6,7 +6,7 @@ pub struct Parser {
     input: String,
 }
 
-pub fn parse(input: String) -> Node {
+pub fn parse(input: String) -> dom::Node {
     Parser::new(input).parse()
 }
 
@@ -15,17 +15,17 @@ impl Parser {
         Parser { pos: 0, input }
     }
 
-    fn parse(&mut self) -> Node {
+    fn parse(&mut self) -> dom::Node {
         let mut children = self.parse_nodes();
 
         if children.len() == 1 {
             return children.remove(0)
         } else {
-            return Node::element("html".to_string(), HashMap::new(), children)
+            return dom::Node::element("html".to_string(), HashMap::new(), children)
         }
     }
 
-    fn parse_nodes(&mut self) -> Vec<Node> {
+    fn parse_nodes(&mut self) -> Vec<dom::Node> {
         let mut nodes = Vec::new();
 
         loop {
@@ -39,7 +39,7 @@ impl Parser {
         return nodes;
     }
 
-    fn parse_node(&mut self) -> Node {
+    fn parse_node(&mut self) -> dom::Node {
         if self.starts_with("<") {
             return self.parse_element()
         } else {
@@ -47,7 +47,7 @@ impl Parser {
         }
     }
 
-    fn parse_element(&mut self) -> Node {
+    fn parse_element(&mut self) -> dom::Node {
         assert!(self.consume_char() == '<');
         let tag = self.parse_tag();
         let attrs = self.parse_attributes();
@@ -59,15 +59,15 @@ impl Parser {
         assert!(self.parse_tag() == tag);
         assert!(self.consume_char() == '>');
 
-        return Node::element(tag, attrs, children);
+        return dom::Node::element(tag, attrs, children);
     }
 
     fn parse_tag(&mut self) -> String {
         self.consume_while(|c| c.is_ascii_alphanumeric())
     }
 
-    fn parse_text(&mut self) -> Node {
-        Node::text(self.consume_while(|c| c != '<'))
+    fn parse_text(&mut self) -> dom::Node {
+        dom::Node::text(self.consume_while(|c| c != '<'))
     }
 
     fn parse_attributes(&mut self) -> HashMap<String, String> {
