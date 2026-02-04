@@ -1,4 +1,4 @@
-use open_otk_browser::{dom, html, css};
+use open_otk_browser::resolve_style;
 
 fn main() {
     let html_input = r#"
@@ -15,8 +15,5 @@ fn main() {
         .title { color: #0000ff; }
     "#.to_string();
 
-    let root_node = html::parse(html_input);
-    let stylesheet = css::parse(css_input);
-
-
+    resolve_style(html_input, css_input);
 }

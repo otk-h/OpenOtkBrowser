@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 #[derive(Debug, PartialEq)]
 pub struct Node {
@@ -33,6 +34,19 @@ impl Node {
                 attributes: attrs,
             }),
             children: children,
+        }
+    }
+}
+
+impl ElementData {
+    pub fn id(&self) -> Option<&String> {
+        self.attributes.get("id")
+    }
+
+    pub fn classes(&self) -> HashSet<&str> {
+        match self.attributes.get("class") {
+            Some(classlist) => classlist.split(' ').collect(),
+            None => HashSet::new()
         }
     }
 }
