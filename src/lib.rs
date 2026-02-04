@@ -15,5 +15,5 @@ pub fn resolve_layout(html_input: String, css_input: String) {
     let layout_root = layout::build_layout_tree(&style_root, viewport);
 
     println!("{:#?}", layout_root);
-    
+     
 }
