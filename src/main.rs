@@ -1,10 +1,10 @@
-use open_otk_browser::resolve_style;
+use open_otk_browser::resolve_layout;
 
 fn main() {
     let html_input = r#"
         <div id="main" class="container">
             <h1 class="title">Hello Rust Browser</h1>
-            <p>通过解析 CSS 渲染样式。</p>
+            <p>test-html</p>
         </div>
     "#.to_string();
 
@@ -15,5 +15,5 @@ fn main() {
         .title { color: #0000ff; }
     "#.to_string();
 
-    resolve_style(html_input, css_input);
+    resolve_layout(html_input, css_input);
 }
