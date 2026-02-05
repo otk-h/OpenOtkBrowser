@@ -1,18 +1,30 @@
-use open_otk_browser::resolve_render;
+use winit::event::{Event, WindowEvent};
+use winit::event_loop::{ControlFlow, EventLoop};
+use winit::window::{WindowBuilder};
+use softbuffer::{Context, Surface};
+use std::num::NonZeroU32;
+use std::sync::Arc;
+
+mod dom;
+mod html;
+mod css;
+mod style;
+mod layout;
+mod render;
 
 fn main() {
     let html_input = r#"
         <div class="a">
             <div class="b">
                 <div class="c">
-                <div class="d">
-                    <div class="e">
-                    <div class="f">
-                        <div class="g">
+                    <div class="d">
+                        <div class="e">
+                            <div class="f">
+                                <div class="g">
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    </div>
-                </div>
                 </div>
             </div>
         </div>
@@ -29,5 +41,51 @@ fn main() {
         .g { background: #800080; }
     "#.to_string();
 
-    resolve_render(html_input, css_input);
+    // init window system
+    let event_loop = EventLoop::new().unwrap();
+    let window = Arc::new(
+        WindowBuilder::new()
+            .with_title("OpenOtkBrowser")
+            .with_inner_size(winit::dpi::LogicalSize::new(800.0, 600.0))
+            .build(&event_loop)
+            .unwrap()
+    );
+    let context = Context::new(window.clone()).unwrap();
+    let mut surface = Surface::new(&context, window.clone()).unwrap();
+
+    // start event loop
+    event_loop.set_control_flow(ControlFlow::Wait);
+    event_loop.run(move |event, elwt| {
+        match event {
+            Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
+                elwt.exit();
+            }
+            Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
+                let size = window.inner_size();
+                let width = NonZeroU32::new(size.width).unwrap();
+                let height = NonZeroU32::new(size.height).unwrap();
+
+                surface.resize(width, height).unwrap();
+
+                let node_root = html::parse(html_input.clone());
+                let stylesheet = css::parse(css_input.clone());
+                let style_root = style::build_style_tree(&node_root, &stylesheet);
+
+                let mut viewport = layout::Dimensions::default();
+                viewport.content.width = size.width as f32;
+                viewport.content.height = size.height as f32;
+
+                let layout_root = layout::build_layout_tree(&style_root, viewport);
+
+                let pixels = render::render_to_buffer(&layout_root, size.width, size.height);
+
+                let mut buffer = surface.buffer_mut().unwrap();
+                buffer.copy_from_slice(&pixels);
+                buffer.present().unwrap();
+                
+            }
+            _ => {}
+        }
+    }).unwrap();
+
 }
