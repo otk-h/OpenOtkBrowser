@@ -41,6 +41,9 @@ fn main() {
         .g { background: #800080; }
     "#.to_string();
 
+    let node_root = html::parse(html_input.clone());
+    let stylesheet = css::parse(css_input.clone());
+
     // init window system
     let event_loop = EventLoop::new().unwrap();
     let window = Arc::new(
@@ -53,23 +56,29 @@ fn main() {
     let context = Context::new(window.clone()).unwrap();
     let mut surface = Surface::new(&context, window.clone()).unwrap();
 
-    // start event loop
-    event_loop.set_control_flow(ControlFlow::Wait);
+    let dom_ref = &node_root;
+    let style_ref = &stylesheet;
+
     event_loop.run(move |event, elwt| {
+        elwt.set_control_flow(ControlFlow::Wait);
+        
         match event {
             Event::WindowEvent { event: WindowEvent::CloseRequested, .. } => {
                 elwt.exit();
             }
+            Event::WindowEvent { event: WindowEvent::Resized(new_size), .. } => {
+                if new_size.width > 0 && new_size.height > 0 {
+                    window.request_redraw();
+                }
+            }
             Event::WindowEvent { event: WindowEvent::RedrawRequested, .. } => {
                 let size = window.inner_size();
+                if size.width == 0 || size.height == 0 { return; }
+
                 let width = NonZeroU32::new(size.width).unwrap();
                 let height = NonZeroU32::new(size.height).unwrap();
 
-                surface.resize(width, height).unwrap();
-
-                let node_root = html::parse(html_input.clone());
-                let stylesheet = css::parse(css_input.clone());
-                let style_root = style::build_style_tree(&node_root, &stylesheet);
+                let style_root = style::build_style_tree(dom_ref, style_ref);
 
                 let mut viewport = layout::Dimensions::default();
                 viewport.content.width = size.width as f32;
@@ -79,10 +88,13 @@ fn main() {
 
                 let pixels = render::render_to_buffer(&layout_root, size.width, size.height);
 
+                surface.resize(width, height).unwrap();
                 let mut buffer = surface.buffer_mut().unwrap();
                 buffer.copy_from_slice(&pixels);
                 buffer.present().unwrap();
-                
+            }
+            Event::AboutToWait => {
+                window.request_redraw(); 
             }
             _ => {}
         }

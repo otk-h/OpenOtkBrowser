@@ -1,133 +1,176 @@
 use crate::dom;
 use std::collections::HashMap;
 
-pub struct Parser {
-    pos: usize,
-    input: String,
+use nom::{
+    branch::alt,
+    bytes::complete::{tag, take_until, take_while, take_while1},
+    character::complete::{alpha1, char, multispace0, multispace1, space0},
+    combinator::{opt, recognize, verify},
+    multi::{many0, fold_many0},
+    sequence::{delimited, pair, preceded, tuple},
+    IResult,
+};
+
+pub fn parse(html_input: String) -> dom::Node {
+    let result: IResult<&str, Vec<dom::Node>> = many0(parse_node)(&html_input);
+
+    match result {
+        Ok((_, mut nodes)) => {
+            if nodes.len() == 1 {
+                nodes.remove(0)
+            } else {
+                dom::Node::element("root".to_string(), HashMap::new(), nodes)
+            }
+        },
+        Err(e) => {
+            eprintln!("Detailed Parse Error: {:?}", e);
+            dom::Node::text("Parse Error".to_string())
+        }
+    }
 }
 
-pub fn parse(input: String) -> dom::Node {
-    Parser::new(input).parse()
+// ---------------------
+// parse attributes
+// ---------------------
+
+fn parse_attributes(input: &str) -> IResult<&str, HashMap<String, String>> {
+    // class="foo" id="bar" ...
+    fold_many0(
+        preceded(multispace1, parse_attribute),
+        HashMap::new,
+        |mut acc: HashMap<String, String>, (k, v)| {
+            acc.insert(k, v);
+            acc
+        }
+    )(input)
 }
 
-impl Parser {
-    fn new(input: String) -> Self {
-        Parser { pos: 0, input }
+fn parse_attribute(input: &str) -> IResult<&str, (String, String)> {
+    // key="value" ...
+    let (input, key) = parse_identifier(input)?;
+    let (input, _) = space0(input)?;
+    let (input, val) = opt(preceded(
+        tuple((char('='), space0)), 
+        alt((
+            delimited(char('"'), take_until("\""), char('"')),
+            delimited(char('\''), take_until("'"), char('\'')),
+        ))
+    ))(input)?;
+
+    // or true as default value
+    let value = val.unwrap_or("").to_string();
+    
+    Ok((input, (key.to_string(), value)))
+}
+
+// ---------------------
+// parse tags
+// ---------------------
+
+fn is_void_tag(tag_name: &str) -> bool {
+    matches!(tag_name.to_lowercase().as_str(), 
+        "area"   |
+        "base"   |
+        "br"     |
+        "col"    |
+        "embed"  |
+        "hr"     |
+        "img"    |
+        "input"  | 
+        "link"   |
+        "meta"   |
+        "param"  |
+        "source" |
+        "track"  |
+        "wbr"
+    )
+}
+
+fn parse_open_tag(input: &str) -> IResult<&str, (String, HashMap<String, String>, bool)> {
+    let (input, _) = char('<')(input)?;
+    let (input, tag_name) = parse_identifier(input)?;
+    let (input, attrs) = parse_attributes(input)?;
+    let (input, _) = multispace0(input)?;
+
+    let (input, self_closing) = opt(char('/'))(input)?; 
+    let (input, _) = char('>')(input)?;
+
+    let is_void = is_void_tag(tag_name) || self_closing.is_some();
+
+    Ok((input, (tag_name.to_string(), attrs, is_void)))
+}
+
+fn parse_close_tag(expected_name: String) -> impl FnMut(&str) -> IResult<&str, &str> {
+    move |input: &str| {
+        let (input, _) = tag("</")(input)?;
+        // 使用 verify 确保解析出的标识符必须等于我们预期的标签名
+        let (input, name) = verify(parse_identifier, |s: &str| s == expected_name)(input)?;
+        let (input, _) = preceded(multispace0, char('>'))(input)?;
+        Ok((input, name))
+    }
+}
+
+// ---------------------
+// parse text
+// ---------------------
+
+fn parse_text(input: &str) -> IResult<&str, dom::Node> {
+    let (input, text) = take_while1(|c| c != '<')(input)?;
+    Ok((input, dom::Node::text(text.to_string())))
+}
+
+fn parse_comment(input: &str) -> IResult<&str, dom::Node> {
+    let (input, content) = tag("")(input)?;
+    let (input, _) = tag("-->")(input)?;
+    Ok((input, dom::Node::comment(content.to_string())))
+}
+
+// ---------------------
+// parse elements
+// ---------------------
+
+fn parse_element(input: &str) -> IResult<&str, dom::Node> {
+    let (input, (tag_name, attrs, is_void)) = parse_open_tag(input)?;
+
+    if is_void {
+        // void_tag no children
+        return Ok((input, dom::Node::element(tag_name, attrs, Vec::new())));
     }
 
-    fn parse(&mut self) -> dom::Node {
-        let mut children = self.parse_nodes();
+    // many0 to repeat until fail
+    let (input, children) = many0(parse_node)(input)?;
 
-        if children.len() == 1 {
-            return children.remove(0)
-        } else {
-            return dom::Node::element("html".to_string(), HashMap::new(), children)
-        }
+    let (input, _) = multispace0(input)?;
+    let (input, _) = parse_close_tag(tag_name.clone())(input)?;
+
+    Ok((input, dom::Node::element(tag_name, attrs, children)))
+}
+
+fn parse_node(input: &str) -> IResult<&str, dom::Node> {
+    // consum whitespaces
+    let (input, _) = multispace0(input)?; 
+    
+    if input.is_empty() {
+        return Err(nom::Err::Error(nom::error::Error::new(input, nom::error::ErrorKind::Eof)));
     }
 
-    fn parse_nodes(&mut self) -> Vec<dom::Node> {
-        let mut nodes = Vec::new();
+    alt((
+        parse_comment,
+        parse_element,
+        parse_text,
+    ))(input)
+}
 
-        loop {
-            self.consume_whitespace();
-            if self.eof() || self.starts_with("</") {
-                break;   
-            }
-            nodes.push(self.parse_node());
-        }
+// ---------------------
+// assistant functions
+// ---------------------
 
-        return nodes;
-    }
-
-    fn parse_node(&mut self) -> dom::Node {
-        if self.starts_with("<") {
-            return self.parse_element()
-        } else {
-            return self.parse_text()
-        }
-    }
-
-    fn parse_element(&mut self) -> dom::Node {
-        assert!(self.consume_char() == '<');
-        let tag = self.parse_tag();
-        let attrs = self.parse_attributes();
-        assert!(self.consume_char() == '>');
-
-        let children = self.parse_nodes();
-        assert!(self.consume_char() == '<');
-        assert!(self.consume_char() == '/');
-        assert!(self.parse_tag() == tag);
-        assert!(self.consume_char() == '>');
-
-        return dom::Node::element(tag, attrs, children);
-    }
-
-    fn parse_tag(&mut self) -> String {
-        self.consume_while(|c| c.is_ascii_alphanumeric())
-    }
-
-    fn parse_text(&mut self) -> dom::Node {
-        dom::Node::text(self.consume_while(|c| c != '<'))
-    }
-
-    fn parse_attributes(&mut self) -> HashMap<String, String> {
-        let mut attributes = HashMap::new();
-        loop {
-            self.consume_whitespace();
-            if self.next_char() == '>' {
-                break;
-            }
-            let (name, value) = self.parse_attribute();
-            attributes.insert(name, value);
-        }
-        return attributes;
-    }
-
-    fn parse_attribute(&mut self) -> (String, String) {
-        let name = self.parse_tag();
-        assert!(self.consume_char() == '=');
-        let value = self.parse_attr_value();
-        return (name, value);
-    }
-
-    fn parse_attr_value(&mut self) -> String {
-        let open_quote = self.consume_char();
-        assert!(open_quote == '"' || open_quote == '\'');
-        let value = self.consume_while(|c| c != open_quote);
-        assert!(self.consume_char() == open_quote);
-        return value;
-    }
-
-    // assistant functions
-
-    fn consume_whitespace(&mut self) {
-        self.consume_while(|c| c.is_whitespace());
-    }
-
-    fn consume_while<F>(&mut self, test: F) -> String 
-    where F: Fn(char) -> bool {
-        let mut result = String::new();
-        while !self.eof() && test(self.next_char()) {
-            result.push(self.consume_char());
-        }
-        return result;
-    }
-
-    fn eof(&mut self) -> bool {
-        return self.pos >= self.input.len();
-    }
-
-    fn consume_char(&mut self) -> char {
-        let ch = self.input[self.pos..].chars().next().unwrap();
-        self.pos += ch.len_utf8();
-        return ch;
-    }
-
-    fn next_char(&self) -> char {
-        self.input[self.pos..].chars().next().unwrap()
-    }
-
-    fn starts_with(&self, s: &str) -> bool {
-        self.input[self.pos..].starts_with(s)
-    }
+fn parse_identifier(input: &str) -> IResult<&str, &str> {
+    // div, class, data-id, ...
+    recognize(
+        pair(
+            alpha1,
+            take_while(|c: char| c.is_alphanumeric() || c == '-' || c == '_')
+        )
+    )(input)
 }

@@ -5,38 +5,38 @@ use tiny_skia;
 pub enum DisplayCommand {
     SolidColor(css::Color, layout::Rect),
     // todo
-    Image,
-    Text,
-    Border,
+    // Image,
+    // Text,
+    // Border,
 }
 
-pub fn paint(layout_root: &layout::LayoutBox, bounds: layout::Rect) -> tiny_skia::Pixmap {
-    let mut pixmap = tiny_skia::Pixmap::new(bounds.width as u32, bounds.height as u32).unwrap();
-    let display_list = build_display_list(layout_root);
+// pub fn paint(layout_root: &layout::LayoutBox, bounds: layout::Rect) -> tiny_skia::Pixmap {
+//     let mut pixmap = tiny_skia::Pixmap::new(bounds.width as u32, bounds.height as u32).unwrap();
+//     let display_list = build_display_list(layout_root);
 
-    for cmd in display_list {
-        match cmd {
-            DisplayCommand::SolidColor(color, rect) => {
-                let skia_color = tiny_skia::Color::from_rgba8(color.r, color.g, color.b, color.a);
+//     for cmd in display_list {
+//         match cmd {
+//             DisplayCommand::SolidColor(color, rect) => {
+//                 let skia_color = tiny_skia::Color::from_rgba8(color.r, color.g, color.b, color.a);
                 
-                let mut paint = tiny_skia::Paint::default();
-                paint.set_color(skia_color);
-                paint.anti_alias = true;
+//                 let mut paint = tiny_skia::Paint::default();
+//                 paint.set_color(skia_color);
+//                 paint.anti_alias = true;
 
-                if let Some(skia_rect) = tiny_skia::Rect::from_xywh(rect.x, rect.y, rect.width, rect.height) {
-                    let mut pb = tiny_skia::PathBuilder::new();
-                    pb.push_rect(skia_rect);
-                    let path = pb.finish().unwrap();
+//                 if let Some(skia_rect) = tiny_skia::Rect::from_xywh(rect.x, rect.y, rect.width, rect.height) {
+//                     let mut pb = tiny_skia::PathBuilder::new();
+//                     pb.push_rect(skia_rect);
+//                     let path = pb.finish().unwrap();
 
-                    pixmap.fill_path(&path, &paint, tiny_skia::FillRule::Winding, tiny_skia::Transform::identity(), None);
-                }
-            }
-            // todo
-            _ => {}
-        }
-    }
-    return pixmap;
-}
+//                     pixmap.fill_path(&path, &paint, tiny_skia::FillRule::Winding, tiny_skia::Transform::identity(), None);
+//                 }
+//             }
+//             // todo
+//             _ => {}
+//         }
+//     }
+//     return pixmap;
+// }
 
 fn build_display_list(layout_root: &layout::LayoutBox) -> Vec<DisplayCommand> {
     let mut list = Vec::new();
@@ -90,9 +90,9 @@ pub fn paint_to_pixmap(layout_root: &layout::LayoutBox, bounds: layout::Rect, pi
                     pixmap.fill_rect(skia_rect, &paint, tiny_skia::Transform::identity(), None);
                 }
             }
-            _ => {
+            // _ => {
 
-            }
+            // }
         }
     }
 }

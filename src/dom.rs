@@ -11,6 +11,7 @@ pub struct Node {
 pub enum NodeType {
     Text(String),
     Element(ElementData),
+    Comment(String),
 }
 
 #[derive(Debug, PartialEq)]
@@ -23,6 +24,13 @@ impl Node {
     pub fn text(data: String) -> Node {
         Node {
             node_type: NodeType::Text(data),
+            children: Vec::new(),
+        }
+    }
+
+    pub fn comment(data: String) -> Node {
+        Node {
+            node_type: NodeType::Comment(data),
             children: Vec::new(),
         }
     }

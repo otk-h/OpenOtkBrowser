@@ -43,7 +43,8 @@ pub fn build_style_tree<'a>(root: &'a dom::Node, stylesheet: &'a css::Stylesheet
         node: root,
         specified_values: match root.node_type {
             dom::NodeType::Element(ref elem) => specified_values(elem, stylesheet),
-            dom::NodeType::Text(_) => HashMap::new()
+            dom::NodeType::Text(_) => HashMap::new(),
+            dom::NodeType::Comment(_) => HashMap::new(),
         },
         children: root.children.iter().map(|child| build_style_tree(child, stylesheet)).collect(),
     }
