@@ -5,10 +5,8 @@ use softbuffer::{Context, Surface};
 use std::num::NonZeroU32;
 use std::sync::Arc;
 
-mod dom;
 mod html;
 mod css;
-mod style;
 mod layout;
 mod render;
 
@@ -41,8 +39,10 @@ fn main() {
         .g { background: #800080; }
     "#.to_string();
 
-    let node_root = html::parse(html_input.clone());
-    let stylesheet = css::parse(css_input.clone());
+    let node_root = html::parse_html(html_input);
+    let stylesheet = css::parse_css(css_input);
+
+    // println!("{:#?}", stylesheet);
 
     // init window system
     let event_loop = EventLoop::new().unwrap();
@@ -78,7 +78,7 @@ fn main() {
                 let width = NonZeroU32::new(size.width).unwrap();
                 let height = NonZeroU32::new(size.height).unwrap();
 
-                let style_root = style::build_style_tree(dom_ref, style_ref);
+                let style_root = css::build_styled_tree(dom_ref, style_ref);
 
                 let mut viewport = layout::Dimensions::default();
                 viewport.content.width = size.width as f32;

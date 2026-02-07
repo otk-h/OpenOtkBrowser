@@ -1,5 +1,5 @@
-use crate::style;
-use crate::css;
+use crate::css::stylesheet::{Value, Unit};
+use crate::css::style::{StyledNode, Display};
 
 #[derive(Default, Debug, Clone, Copy)]
 pub struct Dimensions {
@@ -34,25 +34,25 @@ pub struct LayoutBox<'a> {
 
 #[derive(Debug)]
 pub enum BoxType<'a> {
-    BlockNode(&'a style::StyledNode<'a>),
-    InlineNode(&'a style::StyledNode<'a>),
+    BlockNode(&'a StyledNode<'a>),
+    InlineNode(&'a StyledNode<'a>),
     AnonymousBlock,
 }
 
 impl<'a> LayoutBox<'a> {
-    pub fn new(node: &'a style::StyledNode<'a>) -> LayoutBox<'a> {
+    pub fn new(node: &'a StyledNode<'a>) -> LayoutBox<'a> {
         LayoutBox {
             dimensions: Dimensions::default(),
             box_type: match node.display() {
-                style::Display::Block => BoxType::BlockNode(node),
-                style::Display::Inline => BoxType::InlineNode(node),
-                style::Display::None => panic!("Root node has display: none"),
+                Display::Block => BoxType::BlockNode(node),
+                Display::Inline => BoxType::InlineNode(node),
+                Display::None => panic!("Root node has display: none"),
             },
             children: Vec::new(),
         }
     }
 
-    fn get_style_node(&self) -> &'a style::StyledNode<'a> {
+    fn get_style_node(&self) -> &'a StyledNode<'a> {
         match self.box_type {
             BoxType::BlockNode(node) | BoxType::InlineNode(node) => node,
             BoxType::AnonymousBlock => panic!("Anonymous block box has no style node")
@@ -60,20 +60,20 @@ impl<'a> LayoutBox<'a> {
     }
 }
 
-pub fn build_layout_tree<'a>(node: &'a style::StyledNode<'a>, mut containing_block: Dimensions) -> LayoutBox<'a> {
+pub fn build_layout_tree<'a>(node: &'a StyledNode<'a>, mut containing_block: Dimensions) -> LayoutBox<'a> {
     containing_block.content.height = 0.0;
     let mut root_box = layout_tree(node);
     root_box.layout(containing_block);
     return root_box;
 }
 
-fn layout_tree<'a>(style_node: &'a style::StyledNode<'a>) -> LayoutBox<'a> {
+fn layout_tree<'a>(style_node: &'a StyledNode<'a>) -> LayoutBox<'a> {
     let mut root = LayoutBox::new(style_node);
     for child in &style_node.children {
         match child.display() {
-            style::Display::Block => root.children.push(layout_tree(child)),
-            style::Display::Inline => root.get_inline_container().children.push(layout_tree(child)),
-            style::Display::None => {} 
+            Display::Block => root.children.push(layout_tree(child)),
+            Display::Inline => root.get_inline_container().children.push(layout_tree(child)),
+            Display::None => {} 
         }
     }
     return root;
@@ -97,11 +97,11 @@ impl LayoutBox<'_> {
 
     fn calculate_block_width(&mut self, containing_block: Dimensions) {
         let style = self.get_style_node();
-        let auto = css::Value::Keyword("auto".to_string());
-        let mut width = style.value("width").unwrap_or(auto.clone());
+        let auto = Value::Keyword("auto".to_string());
+        let width_value = style.value("width").unwrap_or(auto.clone());
 
-        let zero = css::Value::Length(0.0, css::Unit::Px);
-        
+        let zero = Value::Length(0.0, Unit::Px);
+
         let mut margin_left = style.lookup("margin-left", "margin", &zero);
         let mut margin_right = style.lookup("margin-right", "margin", &zero);
 
@@ -111,15 +111,16 @@ impl LayoutBox<'_> {
         let padding_left = style.lookup("padding-left", "padding", &zero);
         let padding_right = style.lookup("padding-right", "padding", &zero);
 
+        let mut width = width_value.clone();
         let total: f32 = [&margin_left, &margin_right, &border_left, &border_right, &padding_left, &padding_right, &width]
-                        .iter().map(|v| v.to_px()).sum();
+            .iter().map(|v| v.to_px()).sum();
 
         if width != auto && total > containing_block.content.width {
             if margin_left == auto {
-                margin_left = css::Value::Length(0.0, css::Unit::Px);
+                margin_left = Value::Length(0.0, Unit::Px);
             }
             if margin_right == auto {
-                margin_right = css::Value::Length(0.0, css::Unit::Px);
+                margin_right = Value::Length(0.0, Unit::Px);
             }
         }
 
@@ -127,28 +128,28 @@ impl LayoutBox<'_> {
 
         match (width == auto, margin_left == auto, margin_right == auto) {
             (false, false, false) => {
-                margin_right = css::Value::Length(margin_right.to_px() + underflow, css::Unit::Px);
+                margin_right = Value::Length(margin_right.to_px() + underflow, Unit::Px);
             }
             (false, false, true) => {
-                margin_right = css::Value::Length(underflow, css::Unit::Px);
+                margin_right = Value::Length(underflow, Unit::Px);
             }
             (false, true, false) => {
-                margin_left = css::Value::Length(underflow, css::Unit::Px);
+                margin_left = Value::Length(underflow, Unit::Px);
             }
             (true, _, _) => {
-                if margin_left == auto { margin_left = css::Value::Length(0.0, css::Unit::Px); }
-                if margin_right == auto { margin_right = css::Value::Length(0.0, css::Unit::Px); }
+                if margin_left == auto { margin_left = Value::Length(0.0, Unit::Px); }
+                if margin_right == auto { margin_right = Value::Length(0.0, Unit::Px); }
 
-                if underflow >= 0.0 {
-                    width = css::Value::Length(underflow, css::Unit::Px);
+                width = if underflow >= 0.0 {
+                    Value::Length(underflow, Unit::Px)
                 } else {
-                    width = css::Value::Length(0.0, css::Unit::Px);
-                    margin_right = css::Value::Length(margin_right.to_px() + underflow, css::Unit::Px);
-                }
+                    margin_right = Value::Length(margin_right.to_px() + underflow, Unit::Px);
+                    Value::Length(0.0, Unit::Px)
+                };
             }
             (false, true, true) => {
-                margin_left = css::Value::Length(underflow / 2.0, css::Unit::Px);
-                margin_right = css::Value::Length(underflow / 2.0, css::Unit::Px);
+                margin_left = Value::Length(underflow / 2.0, Unit::Px);
+                margin_right = Value::Length(underflow / 2.0, Unit::Px);
             }
         }
 
@@ -165,7 +166,7 @@ impl LayoutBox<'_> {
     fn calculate_block_position(&mut self, containing_block: Dimensions) {
         let style = self.get_style_node();
         let d = &mut self.dimensions;
-        let zero = css::Value::Length(0.0, css::Unit::Px);
+        let zero = Value::Length(0.0, Unit::Px);
 
         d.margin.top = style.lookup("margin-top", "margin", &zero).to_px();
         d.margin.bottom = style.lookup("margin-bottom", "margin", &zero).to_px();
@@ -189,8 +190,8 @@ impl LayoutBox<'_> {
     }
 
     fn calculate_block_height(&mut self) {
-        if let Some(css::Value::Length(h, css::Unit::Px)) = self.get_style_node().value("height") {
-            self.dimensions.content.height = h;
+        if let Some(Value::Length(h, Unit::Px)) = self.get_style_node().value("height") {
+            self.dimensions.content.height = h.clone();
         }
     }
 

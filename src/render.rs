@@ -1,9 +1,9 @@
+use crate::css::stylesheet::{Color, Value};
 use crate::layout;
-use crate::css;
 use tiny_skia;
 
 pub enum DisplayCommand {
-    SolidColor(css::Color, layout::Rect),
+    SolidColor(Color, layout::Rect),
     // todo
     // Image,
     // Text,
@@ -47,7 +47,7 @@ fn build_display_list(layout_root: &layout::LayoutBox) -> Vec<DisplayCommand> {
 fn render_layout_box(list: &mut Vec<DisplayCommand>, lbox: &layout::LayoutBox) {
     if let layout::BoxType::BlockNode(style_node) = &lbox.box_type {
         let bg_value = style_node.value("background-color").or_else(|| style_node.value("background"));
-        if let Some(css::Value::ColorValue(color)) = bg_value {
+        if let Some(Value::ColorValue(color)) = bg_value {
             list.push(DisplayCommand::SolidColor(color.clone(), lbox.dimensions.content.clone()));
         }
     }

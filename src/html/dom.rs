@@ -1,20 +1,20 @@
 use std::collections::HashMap;
-use std::collections::HashSet;
+// use std::collections::HashSet;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Node {
     pub node_type: NodeType,
     pub children: Vec<Node>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum NodeType {
     Text(String),
     Element(ElementData),
     Comment(String),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ElementData {
     pub tag: String,
     pub attributes: HashMap<String, String>,
@@ -44,17 +44,18 @@ impl Node {
             children: children,
         }
     }
+
 }
 
-impl ElementData {
-    pub fn id(&self) -> Option<&String> {
-        self.attributes.get("id")
-    }
+// impl ElementData {
+    // pub fn id(&self) -> Option<&str> {
+    //     self.attributes.get("id").map(|s| s.as_str())
+    // }
 
-    pub fn classes(&self) -> HashSet<&str> {
-        match self.attributes.get("class") {
-            Some(classlist) => classlist.split(' ').collect(),
-            None => HashSet::new()
-        }
-    }
-}
+    // pub fn classes(&self) -> HashSet<&str> {
+    //     match self.attributes.get("class") {
+    //         Some(classlist) => classlist.split(' ').collect(),
+    //         None => HashSet::new()
+    //     }
+    // }
+// }
